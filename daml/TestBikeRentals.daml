@@ -1,0 +1,107 @@
+module TestBikeRentals where
+
+import Daml.Script
+import DA.Map qualified as M
+-- -- Uncomment the following two lines if looking at the Purchase contract (It does not function correctly but hopefully you can see the idea!):
+-- import DA.Map as Map
+-- import DA.Optional (fromOptional)
+
+import BikeRentals
+
+-- Test to create and archive a contract
+testReturn: Script ()
+testReturn = script do
+    bikeShop <- allocateParty "Central Park Bikes"
+    john <- allocateParty "John Smith"
+    insurance <- allocateParty "State Farm"
+    -- Create New Contract
+    now <- getTime
+    johnAccountCid <- submitMulti [bikeShop, john][]do
+        createCmd RentalContract with
+            bikeShop
+            renterName = john
+            insuranceCompany = insurance
+            totalHrs = 2.0
+            bikesRented = 3.0
+            totalCost = 25.00
+            startTime = now
+    -- Archive an existing contract (Process a return)
+    johnAcount <- submitMulti [bikeShop, john][]do
+        archiveCmd johnAccountCid
+    return ()
+
+
+-- Test to Create, edit, and then archive this edited contract.
+testBikeRentals: Script ()
+testBikeRentals = script do
+    bikeShop <- allocateParty "Central Park Bikes"
+    john <- allocateParty "John Smith"
+    alice <- allocateParty "Alice Snow"
+    insurance1 <- allocateParty "State Farm"
+    insurance2 <- allocateParty "Uninsured"
+    -- Create Contract
+    now <- getTime
+    johnAccountCid <- submitMulti [bikeShop, john][]do
+        createCmd RentalContract with
+            bikeShop
+            renterName = john
+            insuranceCompany = insurance1
+            totalHrs = 2.5
+            bikesRented = 1.0
+            totalCost = 25.00
+            startTime = now
+            
+    -- Create Additional Contract
+    now <- getTime
+    aliceAccountCid <- submitMulti [bikeShop, alice][]do
+        createCmd RentalContract with
+            bikeShop
+            renterName = alice
+            insuranceCompany = insurance2
+            totalHrs = 1.0
+            bikesRented = 1.0
+            totalCost = 25.00
+            startTime = now
+    -- Edit first contract to include added dependents
+    johnAccountCid <- submit john do
+        exerciseCmd johnAccountCid Rent
+            with
+                amount = 1.0 + 2.0
+    -- Edit second contract to include added dependents
+    aliceAccountCid <- submit alice do
+        exerciseCmd aliceAccountCid Rent
+            with
+                amount = 1.0 + 3.0
+    -- Remove an active contract that is no longer the Original id (remove an edited contract)
+    processJohnReturn <- submitMulti [bikeShop, john][]do
+        archiveCmd johnAccountCid
+    -- Remove second contract that has been edited.
+    processAliceReturn <- submitMulti [bikeShop, alice][]do
+        archiveCmd aliceAccountCid
+    return ()
+
+-- testShopInventoryForSale: Script()
+testShopInventoryDatabase : Script ()
+testShopInventoryDatabase = script do
+    debug $ shopItemsForSale
+    let shopItemsMap = M.fromList shopItemsForSale
+    debug $ M.lookup "water" shopItemsMap
+    debug $ M.lookup "granola" shopItemsMap
+    debug $ M.lookup "gatorade" shopItemsMap
+    debug $ M.lookup "Tylenol" shopItemsMap
+    return ()
+
+-- -- Create a contract for the sale of water.
+-- testPurchase: Script ()
+-- testPurchase = script do
+--     bikeShop <- allocateParty "Central Park Bikes"
+--     john <- allocateParty "John Smith"
+
+--     johnPurchaseCid <- submitMulti [bikeShop, john][] do
+--         let waterPurchased = 3
+--         createCmd PurchaseContract with
+--             bikeShop
+--             purchaserName = john
+--             itemCost = shopItemsMap
+--             totalCost = 0
+--     return()

@@ -1,0 +1,119 @@
+-- This project is to create a system to track bike rentals from the bike shop in the SE corner of central park.
+-- We want to be able to add to a ledger each time a bicycle is rented, to whom it is rented to, how many bikes they are renting (might be renting for their family members or firends!), and how long the rental is for.
+-- We want to be able to update this ledger when the bike/bikes are returned. Essentially this means we want to archive a contract once it's reached an agreeable conclusion by the lending party.
+
+module BikeRentalsScratch where
+import DA.Map
+import DA.Map qualified as M
+import DA.Optional (fromOptional)
+import DA.Time
+
+template RentalContract
+    with
+        bikeShop: Party
+        renterName: Party
+        insuranceCompany: Party
+        startTime : Time
+        totalHrs: Numeric 1
+        bikesRented: Numeric 1
+        totalCost: Numeric 1
+    where
+        signatory bikeShop, renterName
+        -- Could add some templateObservers here if we wanted, so something like an insurance company could see taht the contract has been created? Or observers could be optional to other people who the main party is renting the bikes for if there are any?
+        observer insuranceCompany
+        choice Rent: ContractId RentalContract
+            with
+            amount: Numeric 1
+                controller renterName
+                do
+                    now <- getTime
+                    create this with
+                        bikesRented = amount
+                        totalCost = totalCost * amount * totalHrs
+
+-- template to allow for purchases of other goods from the shop
+template PurchaseContract
+    with
+        bikeShop: Party
+        purchaserName: Party
+        itemCost: Map Text Int
+        totalCost: Int
+    where
+        signatory purchaserName
+
+        choice Purchase: ContractId PurchaseContract
+            with
+                itemName: Text
+                amount: Int
+            controller bikeShop
+            do
+                let cost = fromOptional 0 (M.lookup itemName itemCost)
+                create this with
+                    itemCost = M.union itemCost (M.fromList [(itemName, cost)])
+                    totalCost = totalCost + (cost * amount)
+
+
+-- PURCHASE_INVENTOY_BEGIN
+-- Create a Object/Dict/Map that holds three items and their prices: (water, $1), (granola, $5), (gatorade, $3)
+shopItemsForSale: [(Text, Int)]
+shopItemsForSale = [("water", 1),("granola", 5),("gatorade", 3)]
+
+    -- Make it a Map so I can use Map function like Lookup?
+shopItemsMap: Map Text Int
+shopItemsMap = M.fromList shopItemsForSale
+-- PURCHASE_INVENTOY_END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- Current Challenge:
+    -- Inv Management System
+
+-- CHECK_COUNT_BEGIN
+totalInventory: Int
+totalInventory = 40
+totalCurrentlyRented: Int
+totalCurrentlyRented = 1
+    -- How to build this currenlty rented out function with the daml system?
+
+-- checkBicycleInventory: Int -> Int
+checkBicycleInventory: Int
+checkBicycleInventory = 40 - totalCurrentlyRented
+-- CHECK_COUNT_END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--EXTENSION CHALLENGES: 
+    -- High: Automate a tag for when the rental contract is made, and thereby for when the rental contract should end too.
+    -- Low: When the bike is returned, we want to make a note on the ledger if there is a flag, and if so what type of flag it should be. Types of flags should be: injury, overdue, damage. others?
+    -- High: The minimum rental period is 1 hour, and you can't rent out any new bikes if the shop closes in one hour. Don't allow rentals that would go past the shop's closing time essentially. Don't allow a 2hr rental if the shop closes in 1.5 hrs, etc...
+        -- If the bike is not returned after the closing of the day; add a fee per bike?
+    -- Med: Inventory Management System; Have a total of 40 bikes as total inventory.
+        -- Ext to this: offer three types of bikes, one type for kids, one type for women, one type for men. Each type of bike has a different cost and different amount in storage that needs to be updated as contracts are created/archived (As bikes are rented/returned).

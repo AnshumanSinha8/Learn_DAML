@@ -1,0 +1,39 @@
+module TicTacToe where
+import DA.Map as Map
+
+data Player = X | O deriving (Eq, Show)
+type Board = Map.Map (Int, Int) Text
+
+emptyBoard : Board
+emptyBoard = Map.fromList [((i,j), " ") | i <- [1..3], j <- [1..3]]
+
+data GameState = GameState
+  { board : Board
+  , currentPlayer : Player
+  } deriving (Eq, Show)
+
+initialGameState : GameState
+initialGameState = GameState
+  { board = emptyBoard
+  , currentPlayer = X
+  }
+
+makeMove : GameState -> (Int, Int) -> GameState
+makeMove state@(GameState board currentPlayer) (row, col) =
+  case Map.lookup (row, col) board of
+    Nothing -> state
+    Just _ ->
+      let
+        newBoard = Map.insert(row, col) (playerToChar currentPlayer) board
+      in
+        GameState
+          { board = newBoard
+          , currentPlayer = switchPlayer currentPlayer}
+
+playerToChar : Player -> Text
+playerToChar X = "X"
+playerToChar O = "O"
+
+switchPlayer : Player -> Player
+switchPlayer X = O
+switchPlayer O = X

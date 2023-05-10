@@ -1,0 +1,122 @@
+module TestBikeRentalsScratch where
+
+import Daml.Script
+-- import DA.Map as Map
+import DA.Map qualified as M
+-- import DA.Optional (fromOptional)
+
+import BikeRentalsScratch
+
+testReturn: Script ()
+testReturn = script do
+    bikeShop <- allocateParty "Central Park Bikes"
+    john <- allocateParty "John Smith"
+    insurance <- allocateParty "State Farm"
+    -- Create New Contract
+    now <- getTime
+    johnAccountCid <- submitMulti [bikeShop, john][]do
+        createCmd RentalContract with
+            bikeShop
+            renterName = john
+            insuranceCompany = insurance
+            totalHrs = 2.0
+            bikesRented = 3.0
+            totalCost = 25.00
+            startTime = now
+    -- Archive an existing contract (Process a return)
+    johnAcount <- submitMulti [bikeShop, john][]do
+        archiveCmd johnAccountCid
+    return ()
+
+
+-- Test to Create, edit, and return an edited contract.
+testBikeRentals: Script ()
+testBikeRentals = script do
+    bikeShop <- allocateParty "Central Park Bikes"
+    john <- allocateParty "John Smith"
+    alice <- allocateParty "Alice Snow"
+    insurance1 <- allocateParty "State Farm"
+    insurance2 <- allocateParty "Uninsured"
+    -- Create Contract
+    now <- getTime
+    johnAccountCid <- submitMulti [bikeShop, john][]do
+        createCmd RentalContract with
+            bikeShop
+            renterName = john
+            insuranceCompany = insurance1
+            totalHrs = 2.5
+            bikesRented = 1.0
+            totalCost = 25.00
+            startTime = now
+            
+    -- Create Additional Contract
+    now <- getTime
+    aliceAccountCid <- submitMulti [bikeShop, alice][]do
+        createCmd RentalContract with
+            bikeShop
+            renterName = alice
+            insuranceCompany = insurance2
+            totalHrs = 1.0
+            bikesRented = 1.0
+            totalCost = 25.00
+            startTime = now
+    -- Edit first contract to include added dependents
+    johnAccountCid <- submit john do
+        exerciseCmd johnAccountCid Rent
+            with
+                amount = 1.0 + 2.0
+    -- Edit second contract to include added dependents
+    aliceAccountCid <- submit alice do
+        exerciseCmd aliceAccountCid Rent
+            with
+                amount = 1.0 + 3.0
+    -- Remove an active contract that is no longer the Original id (remove an edited contract)
+    processJohnReturn <- submitMulti [bikeShop, john][]do
+        archiveCmd johnAccountCid
+    -- Remove second contract that has been edited.
+    processAliceReturn <- submitMulti [bikeShop, alice][]do
+        archiveCmd aliceAccountCid
+    return ()
+
+-- When a renter is renting on the behalf of others (dependents) I want to keep these separate but tag the dependents contracts to the renter so that there is an order of liability here.
+    -- To do this, I need to create a choice in the template that will create a new contract for each dependent that is specified?
+    -- Temporary fix to this is that I've created an 'AddDependents' choice to just add a sum of dependents and update the total cost of the contract.
+        -- However, this raises a new problem as I'm now unable to delete any contract that's created by adding a dependent to it as I want the choice to be comsuming to create a single contract with a total amount of bikes rented and cost together rather than separate.
+        -- To solve this I need to be able to execute an archiveCmd on the newly generated contract with the dependents included, but how can I do this as I'm unable to retrieve the newJohnAccountCid or whatever it should be named.
+            -- Thought I could use 'self' but it's not in the scope. Idk why :(
+            -- postconsuming choice keyword doesn't allow access to the Cid either.
+        -- I have to be an idiot lmao this was so simple. I was trying to run the archiveCmd on the johnAccountCid which of course is already archived when adding dependents.
+        -- Instead of this I should just have been accessing the johnAccount which is what I was overwriting the old contract with.
+-- So really this was just nomenclature and me not unerstanding how I should be interacting with contracts. I wasn't transforming the contract, rather creating a new one and could have just reassigned the variable name to what it was before instead of trying to create a new variable with a new Contract Id (instead of just the automatically updated Cid)
+
+-- testShopInventoryForSale: Script()
+testShopInventoryDatabase : Script ()
+testShopInventoryDatabase = script do
+    debug $ shopItemsForSale
+    let shopItemsMap = M.fromList shopItemsForSale
+    debug $ M.lookup "water" shopItemsMap
+    debug $ M.lookup "granola" shopItemsMap
+    debug $ M.lookup "gatorade" shopItemsMap
+    debug $ M.lookup "Tylenol" shopItemsMap
+    return ()
+
+-- -- Create a contract for the sale of water.
+-- testPurchase: Script ()
+-- testPurchase = script do
+--     bikeShop <- allocateParty "Central Park Bikes"
+--     john <- allocateParty "John Smith"
+
+--     johnPurchaseCid <- submitMulti [bikeShop, john][] do
+--         let waterPurchased = 3
+--         createCmd PurchaseContract with
+--             bikeShop
+--             purchaserName = john
+--             itemCost = shopItemsMap
+--             totalCost = 0
+--     return()
+
+-- Test Basic Inventory Management System:
+testInventory: Script()
+testInventory = script do
+    debug $ checkBicycleInventory
+    return ()

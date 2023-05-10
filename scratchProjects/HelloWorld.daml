@@ -1,0 +1,107 @@
+module HelloWorld where
+import Daml.Script
+import DA.Map as Map
+import DA.Optional (isNone)
+
+-- BOARD_BEGIN
+type Board = Map.Map (Int, Int) Text
+emptyBoard : Board
+emptyBoard = Map.fromList [((i,j), " ") | i <- [1,2,3], j <- [1,2,3]]
+-- BOARD_END
+
+-- SWITCH_PLAYER_BEGIN
+data Player = X | O deriving (Eq, Show)
+switchPlayer: Player -> Player
+switchPlayer X = O
+switchPlayer O = X
+-- SWITCH_PLAYER_END
+
+-- PLAYER_TO_TEXT_BEGIN
+-- This is necessary to convert the player variable from a value to a string when inserting it into the board.
+playerToText: Player -> Text
+playerToText X = "X"
+playerToText O = "O"
+-- PLAYER_TO_TEXT_END
+
+-- GAMESTATE_BEGIN
+-- this gamestate will need to bind what the board looks like and its current state so we can create a new board when a player successfully makes a move.
+data GameState = GameState
+  { board : Board
+  , currentPlayer : Player
+  } deriving (Eq, Show)
+
+initialGameState : GameState
+initialGameState = GameState
+  { board = emptyBoard
+  , currentPlayer = X
+  }
+-- GAMESTATE_END
+
+-- UPDATEBOARD_BEGIN
+-- the updateBoard function will need to create a new boad while taking in the current gameState and output a new board with the player's move taken into account. It will need to run a function after creating a new board to check for a win condition; or if the board is full it needs to offer to reset the board.
+-- updateBoard : GameState -> (Int, Int) -> GameState
+-- updateBoard gameState (row, col) =
+--   if isNone (Map.lookup (row, col) gameState.board)
+--   then let
+--     newEntry = ((row, col), playerToText gameState.player)
+--     newBoard = newEntry :: Map.toList (Map.delete (row, col) gameState.board)
+--     in
+--         GameState { board = Map.fromList newBoard, currentPlayer = nextPlayer }
+--   else gameState
+
+updateBoard : GameState -> (Int, Int) -> GameState
+updateBoard gameState (row, col) =
+  if isNone (Map.lookup (row, col) gameState.board)
+  then let
+    currentPlayer = gameState.currentPlayer
+    newEntry = ((row, col), playerToText currentPlayer)
+    newBoard = newEntry :: Map.toList (Map.delete (row, col) gameState.board)
+    nextPlayer = switchPlayer currentPlayer
+    in
+        GameState { board = Map.fromList newBoard, currentPlayer = nextPlayer }
+  else gameState
+
+
+-- UPDATEBOARD_END
+
+-- TEST_SCRIPTING:
+testEmptyBoard: Script ()
+testEmptyBoard = script do
+  debug $ emptyBoard
+  -- from here I can throw in different scripts to make moves on the board and that's a really rudimentary way to play the game lol.
+
+-- Testing updateBoard function
+testUpdateBoard: Script ()
+testUpdateBoard = script do
+    -- Attempt # 1
+    let initialState = initialGameState
+        newGameState = updateBoard initialState (0,2)
+        newGameState = updateBoard initialState (1,3)
+    debug $ newGameState.board
+    -- Attempt # 2
+    -- let initialState = initialGameState
+    --     newGameState = updateBoard initialState (1, 2)
+    -- debug $ newGameState.board
+        -- Why does this work only for the (0, 1/2/3) coordinates?????
+            -- Esp bc they don't exist. So it's adding new, but not rewriting.
+            -- Since Daml is immutable, then this means that we're not regenerating the board upon each update call.
+
+
+
+
+
+
+
+
+
+-- CHECK_FOR_WIN_BEGIN
+-- As in the name, this function will check for any win condition and will be called to terminate the game if a win has been met.
+
+-- CHECK_FOR_WIN_END
+
+-- CHECK_FOR_FULL_BEGIN
+-- similar to check for win, however this will essentially just be checking for a draw. This function will trigger if the board is full of playerMoves and no other moves are available.
+
+-- CHECK_FOR_FULL_END
+
+

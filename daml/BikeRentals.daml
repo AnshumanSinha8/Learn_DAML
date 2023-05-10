@@ -1,0 +1,61 @@
+-- This project is to create a system to track bike rentals from the bike shop in Central Park.
+-- Main goals are:
+    -- Create a Contract on the Ledger when a bike is rented, include information relevant to the contract such as renter, shop, cost, amounts, dependents, etc...
+    -- Archive the ledger when a return is processed
+
+module BikeRentals where
+import DA.Map
+import DA.Map qualified as M
+import DA.Optional (fromOptional)
+-- import DA.Time
+
+template RentalContract
+    with
+        bikeShop: Party
+        renterName: Party
+        insuranceCompany: Party
+        startTime : Time
+        totalHrs: Numeric 1
+        bikesRented: Numeric 1
+        totalCost: Numeric 1
+    where
+        signatory bikeShop, renterName
+        observer insuranceCompany
+        choice Rent: ContractId RentalContract
+            with
+            amount: Numeric 1
+                controller renterName
+                do
+                    now <- getTime
+                    create this with
+                        bikesRented = amount
+                        totalCost = totalCost * amount * totalHrs
+
+-- template to allow for purchases of other goods from the shop
+template PurchaseContract
+    with
+        bikeShop: Party
+        purchaserName: Party
+        itemCost: Map Text Int
+        totalCost: Int
+    where
+        signatory purchaserName
+
+        choice Purchase: ContractId PurchaseContract
+            with
+                itemName: Text
+                amount: Int
+            controller bikeShop
+            do
+                let cost = fromOptional 0 (M.lookup itemName itemCost)
+                create this with
+                    itemCost = M.union itemCost (M.fromList [(itemName, cost)])
+                    totalCost = totalCost + (cost * amount)
+
+
+-- PURCHASE_INVENTOY_BEGIN
+shopItemsForSale: [(Text, Int)]
+shopItemsForSale = [("water", 1),("granola", 5),("gatorade", 3)]
+shopItemsMap: Map Text Int
+shopItemsMap = M.fromList shopItemsForSale
+-- PURCHASE_INVENTOY_END

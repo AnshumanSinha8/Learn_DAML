@@ -1,0 +1,79 @@
+module Main where
+
+-- hello: Text -> Text
+-- hello x = "Hello" <> x
+
+-- testHello: Script ()
+-- testHello = script do
+--     debug $ hello "Anshu"
+
+-- In this Main module, I want to create the script that allows us to interact with our TicTacToe board.
+import TicTacToe
+import DA.List
+
+main : Script ()
+main = do
+  let
+    gameState = initialGameState
+  playGame gameState
+
+playGame : GameState -> Script ()
+playGame gameState = do
+  printBoard gameState.board
+  if isGameOver gameState then
+    printEndMessage gameState
+  else do
+    let
+      currentPlayer = gameState.currentPlayer
+    (row, col) <- getPlayerMove currentPlayer
+    let
+      newGameState = makeMove gameState (row, col)
+    playGame newGameState
+
+getPlayerMove : Player -> Script (Int, Int)
+getPlayerMove player = do
+  putStrLn $ "Player " ++ playerToChar player : " turn."
+  putStrLn "Enter row number (1-3):"
+  row <- readLn
+  putStrLn "Enter column number (1-3):"
+  col <- readLn
+  if isValidMove (row, col) then
+    pure (row, col)
+  else do
+    putStrLn "Invalid move. Please try again."
+    getPlayerMove player
+
+isValidMove : (Int, Int) -> Bool
+isValidMove (row, col) =
+  elem (row, col) [(i, j) | i <- [1..3], j <- [1..3]]
+
+isGameOver : GameState -> Bool
+isGameOver gameState =
+  let
+    board = gameState.board
+    rows = [[Map.lookup (i, j) board | j <- [1..3]] | i <- [1..3]]
+    cols = [[Map.lookup (i, j) board | i <- [1..3]] | j <- [1..3]]
+    diags = [[Map.lookup (i, j) board | i <- [1..3], j <- [1..3], i == j],
+             [Map.lookup (i, j) board | i <- [1..3], j <- [1..3], i + j == 4]]
+    lines = rows ++ cols ++ diags
+  in
+    any (\line -> all (== Just 'X') line || all (== Just 'O') line) lines
+
+printBoard : Board -> Script ()
+printBoard board = do
+  let
+    rows = [[Map.lookup (i, j) board | j <- [1..3]] | i <- [1..3]]
+  putStrLn ""
+  mapM_ (\row -> putStrLn (unwords (map showChar row))) rows
+  putStrLn ""
+
+showChar : Maybe Char -> String
+showChar Nothing = " "
+showChar (Just c) = [c]
+
+printEndMessage : GameState -> Script ()
+printEndMessage gameState =
+  let
+    winner = switchPlayer gameState.currentPlayer
+  in
+    putStrLn $ "Player " ++ playerToChar winner : " wins!"
